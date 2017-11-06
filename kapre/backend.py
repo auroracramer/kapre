@@ -176,7 +176,6 @@ def get_stft_kernels(n_dft, n_win=None):
         |  dft_imag_kernels : np.ndarray [shape=(nb_filter, 1, 1, n_win)]
 
     * nb_filter = n_dft/2 + 1
-    * n_win = n_dft
 
     '''
     assert n_dft > 1 and ((n_dft & (n_dft - 1)) == 0), \
@@ -192,15 +191,13 @@ def get_stft_kernels(n_dft, n_win=None):
     dtype = K.floatx()
 
     # prepare DFT filters
-    timesteps = range(n_dft)
+    timesteps = range(n_win)
     w_ks = [(2 * np.pi * k) / float(n_dft) for k in range(n_dft)]
-    dft_real_kernels = np.array([[np.cos(w_k * n) if n < n_win else 0 for n in timesteps]\
-                                  for w_k in w_ks])
-    dft_imag_kernels = np.array([[np.sin(w_k * n) if n < n_win else 0 for n in timesteps]\
-                                  for w_k in w_ks])
+    dft_real_kernels = np.array([[np.cos(w_k * n) for n in timesteps] for w_k in w_ks])
+    dft_imag_kernels = np.array([[np.sin(w_k * n) for n in timesteps] for w_k in w_ks])
 
     # windowing DFT filters
-    dft_window = np.pad(_hann(n_win, sym=False), (0, n_dft - n_win), mode='constant')
+    dft_window = _hann(n_win, sym=False)
     dft_window = dft_window.reshape((1, -1))
     dft_real_kernels = np.multiply(dft_real_kernels, dft_window)
     dft_imag_kernels = np.multiply(dft_imag_kernels, dft_window)
