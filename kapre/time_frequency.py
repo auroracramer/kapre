@@ -97,7 +97,7 @@ class Spectrogram(Layer):
         self.trainable_kernel = trainable_kernel
         self.n_win = n_win
         self.n_hop = n_hop
-        self.padding = 'same'
+        self.padding = padding
         self.power_spectrogram = float(power_spectrogram)
         self.return_decibel_spectrogram = return_decibel_spectrogram
         super(Spectrogram, self).__init__(**kwargs)
