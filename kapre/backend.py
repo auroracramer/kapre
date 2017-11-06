@@ -77,8 +77,8 @@ def mel_frequencies(n_mels=128, fmin=0.0, fmax=11025.0):
 
     def _hz_to_mel(frequencies):
         """Convert Hz to Mels
-        
-        Keunwoo: copied from Librosa        
+
+        Keunwoo: copied from Librosa
         """
         frequencies = np.atleast_1d(frequencies)
 
@@ -124,7 +124,7 @@ def mel(sr, n_dft, n_mels=128, fmin=0.0, fmax=None):
     '''[np] create a filterbank matrix to combine stft bins into mel-frequency bins
     use Slaney
     Keunwoo: copied from Librosa, librosa.filters.mel
-    
+
     n_mels: numbre of mel bands
     fmin : lowest frequency [Hz]
     fmax : highest frequency [Hz]
@@ -158,7 +158,7 @@ def mel(sr, n_dft, n_mels=128, fmin=0.0, fmax=None):
     return weights.astype(K.floatx())
 
 
-def get_stft_kernels(n_dft):
+def get_stft_kernels(n_dft, n_win=None):
     '''[np] Return dft kernels for real/imagnary parts assuming
         the input . is real.
     An asymmetric hann window is used (scipy.signal.hann).
@@ -167,6 +167,8 @@ def get_stft_kernels(n_dft):
     ----------
     n_dft : int > 0 and power of 2 [scalar]
         Number of dft components.
+    n_win : int > 0 and less than or equal to n_dft [scalar]
+        Length of analysis window. If less than n_dft, will be zero padded.
 
     Returns
     -------
@@ -180,17 +182,25 @@ def get_stft_kernels(n_dft):
     assert n_dft > 1 and ((n_dft & (n_dft - 1)) == 0), \
         ('n_dft should be > 1 and power of 2, but n_dft == %d' % n_dft)
 
+    if not n_win:
+        n_win = n_dft
+    else:
+        assert 0 < n_win <= n_dft, \
+            ('n_win should be > 0 and less than or equal to n_dft, but n_win == %d' % n_win)
+
     nb_filter = int(n_dft / 2 + 1)
     dtype = K.floatx()
 
     # prepare DFT filters
     timesteps = range(n_dft)
     w_ks = [(2 * np.pi * k) / float(n_dft) for k in range(n_dft)]
-    dft_real_kernels = np.array([[np.cos(w_k * n) for n in timesteps] for w_k in w_ks])
-    dft_imag_kernels = np.array([[np.sin(w_k * n) for n in timesteps] for w_k in w_ks])
+    dft_real_kernels = np.array([[np.cos(w_k * n) if n < n_win else 0 for n in timesteps]\
+                                  for w_k in w_ks])
+    dft_imag_kernels = np.array([[np.sin(w_k * n) if n < n_win else 0 for n in timesteps]\
+                                  for w_k in w_ks])
 
     # windowing DFT filters
-    dft_window = _hann(n_dft, sym=False)
+    dft_window = np.pad(_hann(n_win, sym=False), (0, n_dft - n_win), mode='constant')
     dft_window = dft_window.reshape((1, -1))
     dft_real_kernels = np.multiply(dft_real_kernels, dft_window)
     dft_imag_kernels = np.multiply(dft_imag_kernels, dft_window)
@@ -203,17 +213,17 @@ def get_stft_kernels(n_dft):
     return dft_real_kernels.astype(K.floatx()), dft_imag_kernels.astype(K.floatx())
 
 
-def get_mel_kernels(sr, n_dft, n_mels, fmin, fmax):
+def get_mel_kernels(sr, n_dft, n_mels, fmin, fmax, n_win=None):
     """
 
     """
-    dft_real_kernels, dft_img_kernels = get_stft_kernels(n_dft)
+    dft_real_kernels, dft_img_kernels = get_stft_kernels(n_dft, n_win=n_win)
     mel_basis = mel(sr, n_dft, n_mels, fmin, fmax)
     mel_basis = np.transpose(mel_basis)
 
 
 def _hann(M, sym=True):
-    '''[np] 
+    '''[np]
     Return a Hann window.
     copied and pasted from scipy.signal.hann,
     https://github.com/scipy/scipy/blob/v0.14.0/scipy/signal/windows.py#L615
@@ -234,7 +244,7 @@ def _hann(M, sym=True):
     w : ndarray
         The window, with the maximum value normalized to 1 (though the value 1
         does not appear if `M` is even and `sym` is True).
-    
+
     '''
     if M < 1:
         return np.array([])
@@ -262,8 +272,8 @@ def filterbank_log(sr, n_freq, n_bins=84, bins_per_octave=12,
 
     Each filter is a log-normal window centered at the corresponding frequency.
 
-    Note: `logfrequency` in librosa 0.4 (deprecated), so copy-and-pasted, 
-        `tuning` was removed, `n_freq` instead of `n_fft`. 
+    Note: `logfrequency` in librosa 0.4 (deprecated), so copy-and-pasted,
+        `tuning` was removed, `n_freq` instead of `n_fft`.
 
     Parameters
     ----------

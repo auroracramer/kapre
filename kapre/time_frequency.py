@@ -13,7 +13,7 @@ class Spectrogram(Layer):
     ### `Spectrogram`
 
     ```python
-    kapre.time_frequency.Spectrogram(n_dft=512, n_hop=None, padding='same',
+    kapre.time_frequency.Spectrogram(n_dft=512, n_win=None, n_hop=None, padding='same',
                                      power_spectrogram=2.0, return_decibel_spectrogram=False,
                                      trainable_kernel=False, image_data_format='default',
                                      **kwargs)
@@ -24,6 +24,10 @@ class Spectrogram(Layer):
      * n_dft: int > 0 [scalar]
        - The number of DFT points, presumably power of 2.
        - Default: ``512``
+
+     * n_win: int > 0 [scalar]
+       - The number of points, used in the STFT frame, less than or equal to ``n_dft``.
+       - Default: ``None`` (``n_dft`` is used)
 
      * n_hop: int > 0 [scalar]
        - Hop length between frames in sample,  probably <= ``n_dft``.
@@ -70,7 +74,7 @@ class Spectrogram(Layer):
 
     """
 
-    def __init__(self, n_dft=512, n_hop=None, padding='same',
+    def __init__(self, n_dft=512, n_win=None, n_hop=None, padding='same',
                  power_spectrogram=2.0, return_decibel_spectrogram=False,
                  trainable_kernel=False, image_data_format='default', **kwargs):
         assert n_dft > 1 and ((n_dft & (n_dft - 1)) == 0), \
@@ -91,6 +95,7 @@ class Spectrogram(Layer):
         assert n_dft % 2 == 0
         self.n_filter = int(n_dft // 2) + 1
         self.trainable_kernel = trainable_kernel
+        self.n_win = n_win
         self.n_hop = n_hop
         self.padding = 'same'
         self.power_spectrogram = float(power_spectrogram)
@@ -113,7 +118,7 @@ class Spectrogram(Layer):
                                           self.padding,
                                           self.n_hop)
 
-        dft_real_kernels, dft_imag_kernels = backend.get_stft_kernels(self.n_dft)
+        dft_real_kernels, dft_imag_kernels = backend.get_stft_kernels(self.n_dft, n_win=self.n_win)
         self.dft_real_kernels = K.variable(dft_real_kernels, dtype=K.floatx(), name="real_kernels")
         self.dft_imag_kernels = K.variable(dft_imag_kernels, dtype=K.floatx(), name="imag_kernels")
         # kernels shapes: (filter_length, 1, input_dim, nb_filter)?
@@ -275,7 +280,7 @@ class Melspectrogram(Spectrogram):
     def build(self, input_shape):
         super(Melspectrogram, self).build(input_shape)
         self.built = False
-        # compute freq2mel matrix --> 
+        # compute freq2mel matrix -->
         mel_basis = backend.mel(self.sr, self.n_dft, self.n_mels, self.fmin, self.fmax)  # (128, 1025) (mel_bin, n_freq)
         mel_basis = np.transpose(mel_basis)
 
