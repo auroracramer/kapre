@@ -114,7 +114,7 @@ class Spectrogram(Layer):
             assert self.len_src >= self.n_dft, 'Hey! The input is too short!'
 
         self.n_frame = conv_output_length(self.len_src,
-                                          self.n_dft,
+                                          self.n_win if self.n_win else self.n_dft,
                                           self.padding,
                                           self.n_hop)
 
