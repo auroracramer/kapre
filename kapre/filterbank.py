@@ -13,7 +13,8 @@ class Filterbank(Layer):
     ### `Filterbank`
 
     `kapre.filterbank.Filterbank(n_fbs, trainable_fb, sr=None, init='mel', fmin=0., fmax=None,
-                                 bins_per_octave=12, image_data_format='default', **kwargs)`
+                                 htk=False, bins_per_octave=12, image_data_format='default',
+                                 **kwargs)`
 
     #### Notes
         Input/output are 2D image format.
@@ -40,13 +41,16 @@ class Filterbank(Layer):
         - max frequency of filterbanks.
         - If `init == 'log'`, fmax is ignored.
 
+    * htk: bool
+        - if True, use HTK formula instead of Slaney for mel filterbanks
+
     * trainable_fb: bool,
         - Whether the filterbanks are trainable or not.
 
     '''
 
     def __init__(self, n_fbs, trainable_fb, sr=None, init='mel', fmin=0., fmax=None,
-                 bins_per_octave=12, image_data_format='default', **kwargs):
+                 htk=False, bins_per_octave=12, image_data_format='default', **kwargs):
         ''' TODO: is sr necessary? is fmax necessary? init with None?  '''
         self.supports_masking = True
         self.n_fbs = n_fbs
@@ -59,6 +63,7 @@ class Filterbank(Layer):
             assert sr is not None
 
         self.fmin = fmin
+        self.htk = htk
         self.init = init
         self.bins_per_octave = bins_per_octave
         self.sr = sr
@@ -85,7 +90,8 @@ class Filterbank(Layer):
                                                                 n_freq=self.n_freq,
                                                                 n_mels=self.n_fbs,
                                                                 fmin=self.fmin,
-                                                                fmax=self.fmax).transpose(),
+                                                                fmax=self.fmax,
+                                                                htk=htk).transpose(),
                                          dtype=K.floatx())
         elif self.init == 'log':
             self.filterbank = K.variable(backend.filterbank_log(sr=self.sr,

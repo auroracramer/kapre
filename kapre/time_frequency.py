@@ -92,7 +92,7 @@ class Spectrogram(Layer):
         self.n_filter = int(n_dft // 2) + 1
         self.trainable_kernel = trainable_kernel
         self.n_hop = n_hop
-        self.padding = 'same'
+        self.padding = padding
         self.power_spectrogram = float(power_spectrogram)
         self.return_decibel_spectrogram = return_decibel_spectrogram
         super(Spectrogram, self).__init__(**kwargs)
@@ -185,7 +185,8 @@ class Melspectrogram(Spectrogram):
     ### `Melspectrogram`
     ```python
     kapre.time_frequency.Melspectrogram(sr=22050, n_mels=128, fmin=0.0, fmax=None,
-                                        power_melgram=1.0, return_decibel_melgram=False,
+                                        htk=False, power_melgram=1.0,
+                                        return_decibel_melgram=False,
                                         trainable_fb=False, **kwargs)
     ```
 
@@ -213,6 +214,10 @@ class Melspectrogram(Spectrogram):
        - Maximum frequency to include in Mel-spectrogram.
        - If `None`, it is inferred as ``sr / 2``.
        - Default: `None`
+
+     * htk: bool
+       - if True, use HTK formula instead of Slaney for mel filterbanks
+       - Default: ``False``
 
      * power_melgram: float [scalar]
        - Power of ``2.0`` if power-spectrogram,
@@ -249,7 +254,7 @@ class Melspectrogram(Spectrogram):
     '''
 
     def __init__(self,
-                 sr=22050, n_mels=128, fmin=0.0, fmax=None,
+                 sr=22050, n_mels=128, fmin=0.0, fmax=None, htk=False,
                  power_melgram=1.0, return_decibel_melgram=False,
                  trainable_fb=False, **kwargs):
 
@@ -268,6 +273,7 @@ class Melspectrogram(Spectrogram):
         self.n_mels = n_mels
         self.fmin = fmin
         self.fmax = fmax
+        self.htk = htk
         self.return_decibel_melgram = return_decibel_melgram
         self.trainable_fb = trainable_fb
         self.power_melgram = power_melgram
@@ -275,8 +281,8 @@ class Melspectrogram(Spectrogram):
     def build(self, input_shape):
         super(Melspectrogram, self).build(input_shape)
         self.built = False
-        # compute freq2mel matrix --> 
-        mel_basis = backend.mel(self.sr, self.n_dft, self.n_mels, self.fmin, self.fmax)  # (128, 1025) (mel_bin, n_freq)
+        # compute freq2mel matrix -->
+        mel_basis = backend.mel(self.sr, self.n_dft, self.n_mels, self.fmin, self.fmax, self.htk)  # (128, 1025) (mel_bin, n_freq)
         mel_basis = np.transpose(mel_basis)
 
         self.freq2mel = K.variable(mel_basis, dtype=K.floatx())
@@ -317,6 +323,7 @@ class Melspectrogram(Spectrogram):
                   'n_mels': self.n_mels,
                   'fmin': self.fmin,
                   'fmax': self.fmax,
+                  'htk': self.htk,
                   'trainable_fb': self.trainable_fb,
                   'power_melgram': self.power_melgram,
                   'return_decibel_melgram': self.return_decibel_melgram}

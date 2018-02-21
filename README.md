@@ -85,7 +85,7 @@ model = Sequential()
 # A mel-spectrogram layer
 model.add(Melspectrogram(n_dft=512, n_hop=256, input_shape=input_shape,
                          padding='same', sr=sr, n_mels=128,
-                         fmin=0.0, fmax=sr/2, power_melgram=1.0,
+                         fmin=0.0, fmax=sr/2, htk=False, power_melgram=1.0,
                          return_decibel_melgram=False, trainable_fb=False,
                          trainable_kernel=False,
                          name='trainable_stft'))
@@ -216,7 +216,7 @@ A Keras layer.
 ([↑up to contents](#contents))
 
 ```python
-kapre.time_frequency.Melspectrogram(sr=22050, n_mels=128, fmin=0.0, fmax=None,
+kapre.time_frequency.Melspectrogram(sr=22050, n_mels=128, fmin=0.0, fmax=None, htk=False,
                                     power_melgram=1.0, return_decibel_melgram=False,
                                     trainable_fb=False, **kwargs)
 ```
@@ -242,6 +242,9 @@ auditory system -- by compressing frequency axis into mel-scale axis.
        - Maximum frequency to include in Mel-spectrogram.
        - If `None`, it is inferred as `sr / 2`.
        - Default: `None`
+     * htk: bool                                                        
+       - if True, use HTK formula instead of Slaney for mel filterbanks 
+       - Default: ``False``                                             
      * power_melgram: float [scalar]
        - Power of `2.0` if power-spectrogram,
        - `1.0` if amplitude spectrogram.

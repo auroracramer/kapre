@@ -47,24 +47,26 @@ def log_frequencies(n_bins=128, fmin=None, fmax=11025.0):
     return np.logspace(np.log2(fmin), np.log2(fmax), num=n_bins, base=2).astype(K.floatx())
 
 
-def mel_frequencies(n_mels=128, fmin=0.0, fmax=11025.0):
+def mel_frequencies(n_mels=128, fmin=0.0, fmax=11025.0, htk=False):
     """[np] Compute the center frequencies of mel bands.
-    `htk` is removed.
     Copied from Librosa 0.4.x
     """
 
-    def _mel_to_hz(mels):
+    def _mel_to_hz(mels, htk=False):
         """Convert mel bin numbers to frequencies
         copied from Librosa
         """
         mels = np.atleast_1d(mels)
+
+        if htk:
+            return 700.0 * (10.0**(mels / 2595.0) - 1.0)
 
         # Fill in the linear scale
         f_min = 0.0
         f_sp = 200.0 / 3
         freqs = f_min + f_sp * mels
 
-        # And now the nonlfinear scale
+        # And now the nonlinear scale
         min_log_hz = 1000.0  # beginning of log region
         min_log_mel = (min_log_hz - f_min) / f_sp  # same (Mels)
         logstep = np.log(6.4) / 27.0  # step size for log region
@@ -75,12 +77,15 @@ def mel_frequencies(n_mels=128, fmin=0.0, fmax=11025.0):
 
         return freqs
 
-    def _hz_to_mel(frequencies):
+    def _hz_to_mel(frequencies, htk=False):
         """Convert Hz to Mels
-        
-        Keunwoo: copied from Librosa        
+
+        Keunwoo: copied from Librosa
         """
         frequencies = np.atleast_1d(frequencies)
+
+        if htk:
+            return 2595.0 * np.log10(1.0 + frequencies / 700.0)
 
         # Fill in the linear part
         f_min = 0.0
@@ -89,6 +94,7 @@ def mel_frequencies(n_mels=128, fmin=0.0, fmax=11025.0):
         mels = (frequencies - f_min) / f_sp
 
         # Fill in the log-scale part
+
         min_log_hz = 1000.0  # beginning of log region
         min_log_mel = (min_log_hz - f_min) / f_sp  # same (Mels)
         logstep = np.log(6.4) / 27.0  # step size for log region
@@ -101,12 +107,12 @@ def mel_frequencies(n_mels=128, fmin=0.0, fmax=11025.0):
 
     ''' mel_frequencies body starts '''
     # 'Center freqs' of mel bands - uniformly spaced between limits
-    min_mels = _hz_to_mel(fmin)
-    max_mel = _hz_to_mel(fmax)
+    min_mel = _hz_to_mel(fmin, htk=htk)
+    max_mel = _hz_to_mel(fmax, htk=htk)
 
-    mels = np.linspace(min_mels, max_mel, n_mels)
+    mels = np.linspace(min_mel, max_mel, n_mels)
 
-    return _mel_to_hz(mels).astype(K.floatx())
+    return _mel_to_hz(mels, htk=htk).astype(K.floatx())
 
 
 def _dft_frequencies(sr=22050, n_dft=2048):
@@ -120,35 +126,38 @@ def _dft_frequencies(sr=22050, n_dft=2048):
                        endpoint=True).astype(K.floatx())
 
 
-def mel(sr, n_dft, n_mels=128, fmin=0.0, fmax=None):
+def mel(sr, n_dft, n_mels=128, fmin=0.0, fmax=None, htk=False):
     '''[np] create a filterbank matrix to combine stft bins into mel-frequency bins
     use Slaney
     Keunwoo: copied from Librosa, librosa.filters.mel
-    
+
     n_mels: numbre of mel bands
     fmin : lowest frequency [Hz]
     fmax : highest frequency [Hz]
         If `None`, use `sr / 2.0`
+    htk  : bool [scalar]
+        use HTK formula instead of Slaney
     '''
     if fmax is None:
         fmax = float(sr) / 2
 
-    # init
+    # Initialize the weights
     n_mels = int(n_mels)
     weights = np.zeros((n_mels, int(1 + n_dft // 2)))
 
-    # center freqs of each FFT bin
+    # Center freqs of each FFT bin
     dftfreqs = _dft_frequencies(sr=sr, n_dft=n_dft)
 
     # centre freqs of mel bands
     freqs = mel_frequencies(n_mels + 2,
                             fmin=fmin,
-                            fmax=fmax)
+                            fmax=fmax,
+                            htk=htk)
     # Slaney-style mel is scaled to be approx constant energy per channel
     enorm = 2.0 / (freqs[2:n_mels + 2] - freqs[:n_mels])
 
     for i in range(n_mels):
-        # lower and upper slopes qfor all bins
+        # lower and upper slopes for all bins
         lower = (dftfreqs - freqs[i]) / (freqs[i + 1] - freqs[i])
         upper = (freqs[i + 2] - dftfreqs) / (freqs[i + 2] - freqs[i + 1])
 
@@ -203,17 +212,17 @@ def get_stft_kernels(n_dft):
     return dft_real_kernels.astype(K.floatx()), dft_imag_kernels.astype(K.floatx())
 
 
-def get_mel_kernels(sr, n_dft, n_mels, fmin, fmax):
+def get_mel_kernels(sr, n_dft, n_mels, fmin, fmax, htk):
     """
 
     """
     dft_real_kernels, dft_img_kernels = get_stft_kernels(n_dft)
-    mel_basis = mel(sr, n_dft, n_mels, fmin, fmax)
+    mel_basis = mel(sr, n_dft, n_mels, fmin, fmax, htk)
     mel_basis = np.transpose(mel_basis)
 
 
 def _hann(M, sym=True):
-    '''[np] 
+    '''[np]
     Return a Hann window.
     copied and pasted from scipy.signal.hann,
     https://github.com/scipy/scipy/blob/v0.14.0/scipy/signal/windows.py#L615
@@ -234,7 +243,7 @@ def _hann(M, sym=True):
     w : ndarray
         The window, with the maximum value normalized to 1 (though the value 1
         does not appear if `M` is even and `sym` is True).
-    
+
     '''
     if M < 1:
         return np.array([])
@@ -251,9 +260,9 @@ def _hann(M, sym=True):
 
 
 # Filterbanks
-def filterbank_mel(sr, n_freq, n_mels=128, fmin=0.0, fmax=None):
+def filterbank_mel(sr, n_freq, n_mels=128, fmin=0.0, fmax=None, htk=False):
     '''[np] '''
-    return mel(sr, (n_freq - 1) * 2, n_mels=n_mels, fmin=fmin, fmax=fmax).astype(K.floatx())
+    return mel(sr, (n_freq - 1) * 2, n_mels=n_mels, fmin=fmin, fmax=fmax, htk=htk).astype(K.floatx())
 
 
 def filterbank_log(sr, n_freq, n_bins=84, bins_per_octave=12,
@@ -262,8 +271,8 @@ def filterbank_log(sr, n_freq, n_bins=84, bins_per_octave=12,
 
     Each filter is a log-normal window centered at the corresponding frequency.
 
-    Note: `logfrequency` in librosa 0.4 (deprecated), so copy-and-pasted, 
-        `tuning` was removed, `n_freq` instead of `n_fft`. 
+    Note: `logfrequency` in librosa 0.4 (deprecated), so copy-and-pasted,
+        `tuning` was removed, `n_freq` instead of `n_fft`.
 
     Parameters
     ----------
